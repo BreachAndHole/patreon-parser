@@ -12,3 +12,10 @@ class FiltersAreNotAppliedError(Exception):
 
 class CantAcceptCookiesError(Exception):
     pass
+
+
+class CantLogInError(Exception):
+    pass
+
+class CantFiterVideoError(Exception):
+    pass
