@@ -14,6 +14,7 @@ from app.parsedpostdata import ParsedPostData
 from app.exceptions import *
 from app.config import *
 from app import queries
+from app import database
 
 
 def get_parsed_posts_data() -> Optional[list[ParsedPostData]]:
@@ -35,29 +36,38 @@ def get_parsed_posts_data() -> Optional[list[ParsedPostData]]:
     except Exception:
         raise CantFiterVideoError
 
-    # TODO: загрудзить последний id поста из файла
-    # last_saved_id = 112852421
-    last_saved_id = 110643256
+    database_posts = database.get_data_from_json()
+    last_saved_post_id = 0
+    if database_posts:
+        last_post_data = database_posts[-1]
+        print(f'{last_post_data.get('id', '0')=}')
+        last_saved_post_id = int(last_post_data.get('id', '0'))
 
     print('Getting last patreon post id')
     last_post_id = __get_last_post_id(driver)
     print(f'Last post ID: {last_post_id}')
 
-    if last_post_id <= last_saved_id:
+    if last_post_id <= last_saved_post_id:
         print('No new posts')
         return None
 
-    while not __is_post_on_current_page(driver, last_saved_id):
-        print(f'Loading more posts to find post with ID {last_saved_id}')
-        __load_another_page(driver, delay_sec=15)
+    page = 1
+    while not __is_post_on_current_page(driver, last_saved_post_id):
+        print(f'Loading more posts to find post with ID {last_saved_post_id}')
+        try:
+            __load_another_page(driver, delay_sec=10 * page)
+        except CantLoadMorePagesError:
+            print('No more pages to lead. CantLoadMorePagesError raised')
+            break
+        page += 1
 
-    print(f'Post with id {last_saved_id} was found')
+    print(f'Post with id {last_saved_post_id} was found')
     post_cards = __get_all_post_cards(driver)
     parsed_posts = parse_post_cards(driver, post_cards)
+    print(f'{len(parsed_posts)} new posts have been parsed')
 
-    print('-' * 40)
-    print(f'{len(parsed_posts)=}')
-    [print(post) for post in parsed_posts]
+    parsed_posts.reverse()
+    database.save_data_to_json(parsed_posts)
 
 
 def __get_firefox_driver() -> webdriver.Firefox:
@@ -83,7 +93,10 @@ def parse_post_cards(driver: webdriver.Firefox, post_cards: list[WebElement]) ->
 
 
 def __load_another_page(driver: webdriver.Firefox, delay_sec=0) -> None:
-    load_more_button = driver.find_element('xpath', queries.LOAD_MORE_POSTS_BUTTON_XPATH)
+    try:
+        load_more_button = driver.find_element('xpath', queries.LOAD_MORE_POSTS_BUTTON_XPATH)
+    except Exception:
+        raise CantLoadMorePagesError
     click_on_element(driver, load_more_button)
     time.sleep(delay_sec)
 

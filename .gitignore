@@ -163,3 +163,4 @@ cython_debug/
 .idea/
 
 /app/all_posts.txt
+/unsented_posts.json

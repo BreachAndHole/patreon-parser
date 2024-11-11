@@ -17,5 +17,10 @@ class CantAcceptCookiesError(Exception):
 class CantLogInError(Exception):
     pass
 
+
 class CantFiterVideoError(Exception):
+    pass
+
+
+class CantLoadMorePagesError(Exception):
     pass
