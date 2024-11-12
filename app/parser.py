@@ -37,15 +37,16 @@ def get_parsed_posts_data() -> Optional[list[ParsedPostData]]:
         raise CantFiterVideoError
 
     database_posts = database.get_data_from_json()
-    last_saved_post_id = 0
     if database_posts:
         last_post_data = database_posts[-1]
-        print(f'{last_post_data.get('id', '0')=}')
         last_saved_post_id = int(last_post_data.get('id', '0'))
+    else:
+        last_saved_post_id = -1 * random.randint(1235423, 1232352355423)
 
     print('Getting last patreon post id')
     last_post_id = __get_last_post_id(driver)
     print(f'Last post ID: {last_post_id}')
+    print(f'Last saved ID: {last_saved_post_id}')
 
     if last_post_id <= last_saved_post_id:
         print('No new posts')
@@ -53,7 +54,7 @@ def get_parsed_posts_data() -> Optional[list[ParsedPostData]]:
 
     page = 1
     while not __is_post_on_current_page(driver, last_saved_post_id):
-        print(f'Loading more posts to find post with ID {last_saved_post_id}')
+        print(f'Loading page {page} to find post with ID {last_saved_post_id}')
         try:
             __load_another_page(driver, delay_sec=10 * page)
         except CantLoadMorePagesError:
@@ -63,11 +64,21 @@ def get_parsed_posts_data() -> Optional[list[ParsedPostData]]:
 
     print(f'Post with id {last_saved_post_id} was found')
     post_cards = __get_all_post_cards(driver)
-    parsed_posts = parse_post_cards(driver, post_cards)
+
+    parsed_posts = parse_post_cards(post_cards)
     print(f'{len(parsed_posts)} new posts have been parsed')
+    driver.quit()
 
     parsed_posts.reverse()
     database.save_data_to_json(parsed_posts)
+    return parsed_posts
+
+
+# def save_raw_posts(cards: list[WebElement]):
+#     for i, card in enumerate(cards, 1):
+#         file_name = f'video_posts_source_code/post_source_{i}.html'
+#         with open(file_name, 'w', encoding='utf-8') as fout:
+#             print(card.get_attribute('innerHTML'), file=fout)
 
 
 def __get_firefox_driver() -> webdriver.Firefox:
@@ -75,12 +86,13 @@ def __get_firefox_driver() -> webdriver.Firefox:
         print('Creating Firefox instance')
         service = Service(executable_path=GeckoDriverManager().install())
         driver = webdriver.Firefox(service=service)
+
     except Exception:
         raise CreatingDriverInstanceError
     return driver
 
 
-def parse_post_cards(driver: webdriver.Firefox, post_cards: list[WebElement]) -> list[ParsedPostData]:
+def parse_post_cards(post_cards: list[WebElement]) -> list[ParsedPostData]:
     print('Parsing post cards')
     parsed_posts: list[ParsedPostData] = []
     for i, card in enumerate(post_cards, 1):
@@ -102,10 +114,8 @@ def __load_another_page(driver: webdriver.Firefox, delay_sec=0) -> None:
 
 
 def __is_post_on_current_page(driver: webdriver.Firefox, post_id: int) -> bool:
-    print(f'Checking if post with ID {post_id} is on current page')
     search_post_by_id_xpath = f'//a[contains(@href, {post_id})]'
     matching_elements = driver.find_elements('xpath', search_post_by_id_xpath)
-    print(f'{len(matching_elements)=}')
     return bool(len(matching_elements))
 
 
@@ -207,7 +217,7 @@ def __show_only_video_posts(driver: webdriver.Firefox) -> None:
 
 def __filter_old_to_new_posts(driver: webdriver.Firefox) -> None:
     wait_random_time()
-    assert driver.current_url == NATALIEGOLD_URL, 'Trying to filter posts while no on the NatalieGold\'s page'
+    assert driver.current_url == NATALIEGOLD_URL, 'Trying to filter posts while on the NatalieGold\'s page'
     sort_button_element = driver.find_element('xpath', '//button[@aria-label="Sort posts by age"]')
     click_on_element(driver, sort_button_element)
 
